@@ -1,0 +1,11 @@
+{
+  "name": "firefox-native-tab-search",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A native vertical-tabs search field for stable Firefox without an extension.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test",
+    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File ./build.ps1"
+  }
+}

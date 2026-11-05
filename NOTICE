@@ -1,0 +1,10 @@
+Firefox Native Tab Search is a standalone reimplementation of the native
+vertical-tabs search integration from TabSearch by Mike Irvin.
+
+Original project: https://github.com/irvinm/TabSearch
+Original license: MIT, Copyright (c) 2025 Mike Irvin
+
+The standalone version removes the WebExtension dependency: the search field,
+matching logic and tab visibility handling are implemented directly in a
+privileged Autoconfig chrome script. The matching and visibility-plan rules
+are derived from TabSearch's native filter.
