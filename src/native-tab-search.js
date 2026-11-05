@@ -1013,6 +1013,12 @@ var FirefoxNativeTabSearch = (function () {
 
     ensureStyle(doc);
 
+    // Remove markers left by a previous integration instance, for example
+    // after a browser UI reload or crash. They must never outlive a session.
+    for (const group of doc.querySelectorAll('tab-group[data-fnts-hidden]')) {
+      group.removeAttribute('data-fnts-hidden');
+    }
+
     const host = createHtml(doc, 'div', '', HOST_ID);
     host.setAttribute('data-firefox-native-tab-search', VERSION);
     host.style.height = `${COLLAPSED_HEIGHT}px`;
