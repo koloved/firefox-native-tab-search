@@ -218,6 +218,9 @@ var FirefoxNativeTabSearch = (function () {
         outline: 1px solid var(--fnts-accent);
         outline-offset: -2px;
       }
+      #${CLEAR_ID}[hidden] {
+        display: none !important;
+      }
       #${CLEAR_ID} {
         position: absolute;
         inset-inline-end: 4px;
@@ -508,7 +511,7 @@ var FirefoxNativeTabSearch = (function () {
     } else {
       instance.status.removeAttribute('title');
     }
-    const filterActive = !!(session.active && session.query);
+    const filterActive = !!(session.active && typeof session.query === 'string' && session.query.trim());
     instance.dot.hidden = !filterActive;
     instance.expand.title = filterActive ? 'Search tabs (filter active)' : 'Search tabs';
   }
@@ -617,18 +620,19 @@ var FirefoxNativeTabSearch = (function () {
     if (!instance || instance.disposed || !core) return;
     const session = instance.session;
     const win = instance.win;
+    const query = typeof session.query === 'string' ? session.query.trim() : '';
 
-    if (!session.query) {
+    if (!query) {
       clearSession(instance, { keepInput: false, showTabs: true });
       return;
     }
 
     if (!session.active) {
-      beginSession(instance, session.query);
+      beginSession(instance, query);
     }
 
     const tabs = describeTabs(win);
-    const matchedIds = core.computeMatchedIds(tabs, session.query);
+    const matchedIds = core.computeMatchedIds(tabs, query);
     const plan = core.buildVisibilityPlan(
       tabs,
       matchedIds,
@@ -677,7 +681,7 @@ var FirefoxNativeTabSearch = (function () {
 
     session.state = {
       active: true,
-      query: session.query,
+      query,
       total: tabs.length,
       matched: plan.matchedCount,
       visibleMatched: plan.visibleMatched,
@@ -760,6 +764,7 @@ var FirefoxNativeTabSearch = (function () {
     const session = instance.session;
     session.query = instance.input.value;
     updateClearButton(instance);
+    if (instance.composing) return;
     if (session.inputTimer) instance.win.clearTimeout(session.inputTimer);
     session.inputTimer = instance.win.setTimeout(() => {
       session.inputTimer = null;
@@ -982,8 +987,11 @@ var FirefoxNativeTabSearch = (function () {
       observers: [],
       keyElement: null,
       countTimer: null,
+      composing: false,
+      unloadListener: null,
       disposed: false,
     };
+    instance.shutdown = () => shutdownWindow(win);
 
     /**
      * Registers a DOM event listener and remembers it for cleanup.
@@ -1000,6 +1008,13 @@ var FirefoxNativeTabSearch = (function () {
     };
 
     listen(input, 'input', () => onInput(instance));
+    listen(input, 'compositionstart', () => {
+      instance.composing = true;
+    });
+    listen(input, 'compositionend', () => {
+      instance.composing = false;
+      onInput(instance);
+    });
     listen(input, 'keydown', event => onKeyDown(instance, event));
     listen(clearButton, 'click', () => {
       clearSession(instance);
@@ -1087,7 +1102,7 @@ var FirefoxNativeTabSearch = (function () {
         const replaceObserver = new win.MutationObserver(() => {
           if (instance.disposed) return;
           if (doc.getElementById(HOST_ID)) return;
-          clearSession(instance);
+          shutdownWindow(win);
           initWindow(win);
         });
         replaceObserver.observe(sidebarContainer, { childList: true });
@@ -1117,7 +1132,6 @@ var FirefoxNativeTabSearch = (function () {
       instance = null;
     }
     if (!instance) return;
-    instance.disposed = true;
     if (instance.session.inputTimer) {
       try {
         win.clearTimeout(instance.session.inputTimer);
@@ -1139,7 +1153,22 @@ var FirefoxNativeTabSearch = (function () {
         // Window is closing.
       }
     }
-    clearSession(instance, { keepInput: true, showTabs: true });
+    // Restore hidden tabs before marking the instance disposed. clearSession
+    // refuses to run on a disposed instance, and hidden tabs would otherwise
+    // be persisted by session restore.
+    try {
+      clearSession(instance, { keepInput: true, showTabs: true });
+    } catch (err) {
+      warn('Could not restore tabs while closing the window:', err);
+    }
+    instance.disposed = true;
+    if (instance.unloadListener) {
+      try {
+        win.removeEventListener('unload', instance.unloadListener);
+      } catch {
+        // Window is closing.
+      }
+    }
     for (const listener of instance.listeners) {
       try {
         listener.target.removeEventListener(listener.type, listener.handler, listener.options);
@@ -1190,11 +1219,18 @@ var FirefoxNativeTabSearch = (function () {
     if (instance) {
       win.__firefoxNativeTabSearchInstance = instance;
       try {
-        win.addEventListener(
-          'unload',
-          () => shutdownWindow(win),
-          { once: true }
-        );
+        win.FirefoxNativeTabSearch = {
+          version: VERSION,
+          init: () => initWindow(win),
+          shutdown: () => shutdownWindow(win),
+        };
+      } catch {
+        // The window may be closing.
+      }
+      try {
+        const unloadListener = () => shutdownWindow(win);
+        win.addEventListener('unload', unloadListener, { once: true });
+        instance.unloadListener = unloadListener;
       } catch {
         // Window may be closing.
       }

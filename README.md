@@ -17,6 +17,10 @@ come back. Active and pinned tabs always stay visible.
 - Administrator rights for installation: Firefox usually lives in
   `C:\Program Files`, and Autoconfig files must sit next to `firefox.exe`.
 
+Tested on Windows with stable Firefox 159.0: filtering and clearing,
+pinned/active tabs, new tabs during a filter, external show, collapsed sidebar,
+`Ctrl+Alt+F`, and multiple windows.
+
 ## Install
 
 1. Download or clone this repository (or the release ZIP).
@@ -48,6 +52,7 @@ To install into a non-standard location:
 - Type a title, URL or domain. Whitespace separates terms; every term must
   match.
 - Press **Esc** or click the clear button to restore the tabs.
+- The panel follows the Firefox light or dark theme.
 - **Active, pinned, and browser-protected tabs** cannot be hidden by Firefox and
   are reported by the counter.
 - A tab you were on while it did not match stays visible for the session

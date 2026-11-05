@@ -249,6 +249,8 @@ if ($core -notmatch "FirefoxNativeTabSearchCore" -or $ui -notmatch "FirefoxNativ
   Fail "The source files do not look like a complete package."
 }
 $cfg = $core + "`r`n`r`n" + $ui + "`r`n`r`n" + $entry
+# Firefox Autoconfig skips the first line of the file. Keep a harmless header
+# comment there so the real script starts on line 2.
 $header = "// Firefox Native Tab Search - Autoconfig loader. Generated file; do not edit.`r`n"
 $cfg = $header + $cfg
 

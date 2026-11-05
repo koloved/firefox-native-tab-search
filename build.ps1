@@ -40,6 +40,8 @@ New-Item -ItemType Directory -Path $dist -Force | Out-Null
 $core = [System.IO.File]::ReadAllText($corePath)
 $ui = [System.IO.File]::ReadAllText($uiPath)
 $entry = [System.IO.File]::ReadAllText($entryPath)
+# Firefox Autoconfig skips the first line of the file. Keep a harmless header
+# comment there so the real script starts on line 2.
 $header = "// Firefox Native Tab Search - Autoconfig loader. Generated file; do not edit.`r`n"
 $cfg = $header + $core + "`r`n`r`n" + $ui + "`r`n`r`n" + $entry
 

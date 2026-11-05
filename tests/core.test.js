@@ -77,6 +77,19 @@ test('buildVisibilityPlan - counts active non-matching tabs as blocked', () => {
   assert.equal(plan.keptVisible, 1);
 });
 
+test('buildVisibilityPlan - restores owned tabs that became active or pinned', () => {
+  const tabs = [
+    { id: 1, active: true, pinned: false, hidden: true },
+    { id: 2, active: false, pinned: true, hidden: true },
+    { id: 3, active: false, pinned: false, hidden: false },
+  ];
+  const plan = core.buildVisibilityPlan(tabs, new Set([3]), new Set([1, 2]));
+  assert.deepEqual(plan.toShow.sort((a, b) => a - b), [1, 2]);
+  assert.deepEqual(plan.toHide, []);
+  assert.equal(plan.blockedActive, 1);
+  assert.equal(plan.blockedPinned, 1);
+});
+
 test('buildVisibilityPlan - shows only tabs hidden by this session', () => {
   const tabs = [
     { id: 1, active: false, pinned: false, hidden: true },

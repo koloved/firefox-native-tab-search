@@ -181,10 +181,12 @@ var FirefoxNativeTabSearchCore = (function () {
 
       if (tab.pinned) {
         blockedPinned++;
+        if (tab.hidden && owned.has(tab.id)) toShow.push(tab.id);
         continue;
       }
       if (tab.active) {
         blockedActive++;
+        if (tab.hidden && owned.has(tab.id)) toShow.push(tab.id);
         continue;
       }
       if (protectedTabs.has(tab.id)) {
