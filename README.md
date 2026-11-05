@@ -8,7 +8,7 @@ Type in the field and non-matching tabs are hidden with Firefox's native
 `gBrowser.hideTab()`. Clear the field and only the tabs hidden by this session
 come back. Active and pinned tabs always stay visible.
 
-<video src="docs/demo.mp4" controls muted loop playsinline></video>
+<video src="https://raw.githubusercontent.com/koloved/firefox-native-tab-search/main/docs/demo.mp4" controls muted loop playsinline></video>
 
 ## Requirements
 
