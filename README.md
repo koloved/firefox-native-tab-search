@@ -8,7 +8,7 @@ Type in the field and non-matching tabs are hidden with Firefox's native
 `gBrowser.hideTab()`. Clear the field and only the tabs hidden by this session
 come back. Active and pinned tabs always stay visible.
 
-![Screenshot](docs/screenshot.png)
+<video src="docs/demo.mp4" controls muted loop playsinline></video>
 
 ## Requirements
 
@@ -18,8 +18,8 @@ come back. Active and pinned tabs always stay visible.
   `C:\Program Files`, and Autoconfig files must sit next to `firefox.exe`.
 
 Tested on Windows with stable Firefox 159.0: filtering and clearing,
-pinned/active tabs, new tabs during a filter, external show, collapsed sidebar,
-`Ctrl+Alt+F`, and multiple windows.
+pinned/active tabs, new tabs during a filter, external show, native tab groups,
+collapsed sidebar, `Ctrl+Alt+F`, and multiple windows.
 
 ## Install
 
@@ -60,6 +60,9 @@ To install into a non-standard location:
 - Tabs opened while the filter is active — including `+ New Tab` and links
   opened in the background — stay visible until the filter is cleared
   (`N new`).
+- Native tab groups with no matching tabs are hidden while the filter is
+  active. Their headers return when the filter is cleared, and your
+  collapsed/expanded state is preserved.
 - When the sidebar is collapsed, the panel becomes a single search icon.
 
 ## Uninstall

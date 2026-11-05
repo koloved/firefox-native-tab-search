@@ -310,6 +310,12 @@ var FirefoxNativeTabSearch = (function () {
       #${HOST_ID}[data-collapsed] #${EXPAND_ID} {
         display: flex;
       }
+      /* Hide a native tab group only while it has no visible or matching
+         tabs. A private attribute is used so the user's collapsed/expanded
+         state is never changed. */
+      tab-group[data-fnts-hidden] {
+        display: none !important;
+      }
       #${HOST_ID} .fnts-dot {
         position: absolute;
         top: 4px;
@@ -527,6 +533,82 @@ var FirefoxNativeTabSearch = (function () {
   }
 
   /**
+   * Removes the integration's hidden marker from every tab group.
+   *
+   * @param {Object} instance - Per-window integration state.
+   * @returns {void}
+   */
+  function restoreGroups(instance) {
+    if (!instance || instance.disposed) return;
+    try {
+      const groups = instance.doc.querySelectorAll('tab-group[data-fnts-hidden]');
+      for (const group of groups) {
+        group.removeAttribute('data-fnts-hidden');
+      }
+    } catch (err) {
+      warn('Could not restore tab groups:', err);
+    }
+  }
+
+  /**
+   * Hides tab groups that have no visible or potentially visible tabs.
+   *
+   * Expanded groups stay visible only while at least one tab is visible.
+   * Collapsed groups stay visible while they contain a matching, active,
+   * pinned, protected, new or externally shown tab. Empty groups are hidden
+   * during the filter.
+   *
+   * @param {Object} instance - Per-window integration state.
+   * @param {Set<*>|Array<*>} matchedIds - Tabs matching the current query.
+   * @returns {void}
+   */
+  function updateGroupVisibility(instance, matchedIds) {
+    if (!instance || instance.disposed) return;
+    const session = instance.session;
+    const matched = matchedIds instanceof Set ? matchedIds : new Set(matchedIds || []);
+    let groups = [];
+    try {
+      groups = instance.win.gBrowser.getAllTabGroups
+        ? instance.win.gBrowser.getAllTabGroups()
+        : [];
+    } catch (err) {
+      warn('Could not enumerate tab groups:', err);
+      return;
+    }
+
+    for (const group of groups) {
+      if (!group || group.isConnected === false) continue;
+      const groupTabs = Array.from(group.tabs || []);
+      const kept = new Set();
+      for (const tab of groupTabs) {
+        if (
+          tab.selected ||
+          tab.pinned ||
+          session.protectedActive.has(tab) ||
+          session.newTabs.has(tab) ||
+          session.exempt.has(tab)
+        ) {
+          kept.add(tab);
+        }
+      }
+      const shouldHide = core.shouldHideGroup(
+        {
+          collapsed: !!group.collapsed,
+          tabs: groupTabs.map(tab => ({ id: tab, hidden: !!tab.hidden })),
+        },
+        matched,
+        kept
+      );
+
+      if (shouldHide) {
+        group.setAttribute('data-fnts-hidden', 'true');
+      } else {
+        group.removeAttribute('data-fnts-hidden');
+      }
+    }
+  }
+
+  /**
    * Focuses the search field, expanding the sidebar first when necessary.
    *
    * @param {Object} instance - Per-window integration state.
@@ -679,6 +761,8 @@ var FirefoxNativeTabSearch = (function () {
       session.applying = false;
     }
 
+    updateGroupVisibility(instance, matchedIds);
+
     session.state = {
       active: true,
       query,
@@ -737,6 +821,8 @@ var FirefoxNativeTabSearch = (function () {
     } finally {
       session.applying = false;
     }
+
+    restoreGroups(instance);
 
     session.active = false;
     session.query = '';
@@ -1093,6 +1179,34 @@ var FirefoxNativeTabSearch = (function () {
       instance.observers.push(layoutObserver);
     } catch (err) {
       warn('Could not observe the vertical tab layout:', err);
+    }
+
+    // Tab groups are added, removed, collapsed and expanded outside the
+    // regular tab events. Re-run the filter so group headers disappear when
+    // their last visible tab is hidden.
+    try {
+      const scrollbox = doc.getElementById('tabbrowser-arrowscrollbox');
+      if (scrollbox) {
+        const groupObserver = new win.MutationObserver(() => {
+          if (instance.disposed || !instance.session.active) return;
+          scheduleApply(instance, 30);
+        });
+        groupObserver.observe(scrollbox, { childList: true });
+        instance.observers.push(groupObserver);
+
+        const collapseObserver = new win.MutationObserver(() => {
+          if (instance.disposed || !instance.session.active) return;
+          scheduleApply(instance, 30);
+        });
+        collapseObserver.observe(scrollbox, {
+          attributes: true,
+          subtree: true,
+          attributeFilter: ['collapsed'],
+        });
+        instance.observers.push(collapseObserver);
+      }
+    } catch (err) {
+      warn('Could not observe tab groups:', err);
     }
 
     // If the whole sidebar DOM is replaced, recreate the panel.

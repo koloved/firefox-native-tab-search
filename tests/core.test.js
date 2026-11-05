@@ -139,6 +139,49 @@ test('buildVisibilityPlan - leaves tabs hidden by someone else alone', () => {
   assert.equal(plan.hiddenByOther, 1);
 });
 
+test('shouldHideGroup - expanded groups follow visible tabs', () => {
+  assert.equal(core.shouldHideGroup({ collapsed: false, tabs: [] }, new Set()), true);
+  assert.equal(
+    core.shouldHideGroup(
+      { collapsed: false, tabs: [{ id: 1, hidden: true }, { id: 2, hidden: false }] },
+      new Set([1])
+    ),
+    false
+  );
+  assert.equal(
+    core.shouldHideGroup(
+      { collapsed: false, tabs: [{ id: 1, hidden: true }, { id: 2, hidden: true }] },
+      new Set([1, 2])
+    ),
+    true
+  );
+});
+
+test('shouldHideGroup - collapsed groups follow matching and kept tabs', () => {
+  assert.equal(
+    core.shouldHideGroup(
+      { collapsed: true, tabs: [{ id: 1, hidden: false }, { id: 2, hidden: false }] },
+      new Set([2])
+    ),
+    false
+  );
+  assert.equal(
+    core.shouldHideGroup(
+      { collapsed: true, tabs: [{ id: 1, hidden: false }, { id: 2, hidden: false }] },
+      new Set([3])
+    ),
+    true
+  );
+  assert.equal(
+    core.shouldHideGroup(
+      { collapsed: true, tabs: [{ id: 1, hidden: false }] },
+      new Set(),
+      new Set([1])
+    ),
+    false
+  );
+});
+
 test('formatStatus - inactive and active states', () => {
   assert.equal(core.formatStatus({ active: false, total: 12 }), 'Open tabs: 12');
   assert.equal(core.formatStatus({ active: false, total: 0 }), '');

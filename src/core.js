@@ -226,6 +226,29 @@ var FirefoxNativeTabSearchCore = (function () {
   }
 
   /**
+   * Decides whether a native tab group should be hidden during a filter.
+   *
+   * Expanded groups stay visible while at least one tab is visible. Collapsed
+   * groups stay visible while they contain a matching or explicitly kept tab.
+   * Empty groups are hidden.
+   *
+   * @param {{collapsed?: boolean, tabs?: Array<{id: *, hidden?: boolean}>}} group - Group descriptor.
+   * @param {Set<*>|Array<*>} matchedIds - Tabs matching the query.
+   * @param {Set<*>|Array<*>} [keptIds=new Set()] - Tabs that must stay visible (active, new, protected, exempt).
+   * @returns {boolean} True when the group header should be hidden.
+   */
+  function shouldHideGroup(group, matchedIds, keptIds = new Set()) {
+    const tabs = group && Array.isArray(group.tabs) ? group.tabs : [];
+    if (tabs.length === 0) return true;
+    const matched = toSet(matchedIds);
+    const kept = toSet(keptIds);
+    if (group.collapsed) {
+      return !tabs.some(tab => matched.has(tab.id) || kept.has(tab.id));
+    }
+    return !tabs.some(tab => !tab.hidden);
+  }
+
+  /**
    * Formats the one-line counter shown under the search field.
    *
    * @param {Object|null} state - Session state snapshot.
@@ -296,6 +319,7 @@ var FirefoxNativeTabSearchCore = (function () {
     matchesTab,
     computeMatchedIds,
     buildVisibilityPlan,
+    shouldHideGroup,
     formatStatus,
     formatStatusTitle,
   };
