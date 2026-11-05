@@ -133,6 +133,7 @@ Test against a copy of Firefox without touching your main installation:
 
 ```powershell
 robocopy "C:\Program Files\Mozilla Firefox" "$env:TEMP\ff-test" /E
+.\install.ps1 -FirefoxDir "$env:TEMP\ff-test" -WhatIf   # preview, no changes
 .\install.ps1 -FirefoxDir "$env:TEMP\ff-test"
 ```
 
