@@ -232,3 +232,118 @@ test('formatStatusTitle - explains the counters', () => {
   assert.match(title, /New tabs kept visible: 2/);
   assert.match(title, /Protected by browser: 3/);
 });
+
+test('getTabText - keeps the original case for camelCase detection', () => {
+  const text = core.getTabText({ title: 'TabSearch', url: 'https://Example.COM/Path' });
+  assert.equal(text.title, 'TabSearch');
+  assert.equal(text.url, 'https://Example.COM/Path');
+  assert.equal(text.hostname, 'example.com');
+});
+
+test('matchesTab - fuzzy subsequences find abbreviations and skipped letters', () => {
+  const tab = { id: 1, title: 'GitHub Docs', url: 'https://docs.github.com/' };
+  assert.equal(core.matchesTab(tab, ['ghd']), true);
+  assert.equal(core.matchesTab(tab, ['gh']), true);
+  assert.equal(core.matchesTab(tab, ['gihub']), true);
+  assert.equal(core.matchesTab(tab, ['xyz']), false);
+});
+
+test('matchesTab - literal substrings keep matching', () => {
+  const gmail = { id: 1, title: 'Gmail - Inbox', url: 'https://mail.google.com/' };
+  assert.equal(core.matchesTab(gmail, ['mail']), true);
+  const github = { id: 2, title: 'GitHub Docs', url: 'https://docs.github.com/' };
+  assert.equal(core.matchesTab(github, ['hub']), true);
+  assert.equal(core.matchesTab(github, ['docs']), true);
+});
+
+test('matchesTab - fuzzy matches must start on a word boundary', () => {
+  const reddit = { id: 1, title: 'Reddit - Dive into anything', url: 'https://reddit.com/' };
+  assert.equal(core.matchesTab(reddit, ['gh']), false);
+  const stack = { id: 2, title: 'Stack Overflow', url: 'https://stackoverflow.com/' };
+  assert.equal(core.matchesTab(stack, ['gh']), false);
+});
+
+test('matchesTab - camelCase humps count as word boundaries', () => {
+  const tab = { id: 1, title: 'TabSearch', url: 'https://example.com/' };
+  assert.equal(core.matchesTab(tab, ['ts']), true);
+  assert.equal(core.matchesTab(tab, ['srch']), true);
+});
+
+test('matchesTab - fuzzy matching works for Cyrillic titles', () => {
+  const tab = { id: 1, title: 'Документация Firefox', url: 'https://example.com/' };
+  assert.equal(core.matchesTab(tab, ['док']), true);
+  assert.equal(core.matchesTab(tab, ['дкм']), true);
+});
+
+test('matchesTab - fuzzy matching can be disabled', () => {
+  const tab = { id: 1, title: 'GitHub Docs', url: 'https://docs.github.com/' };
+  assert.equal(core.matchesTab(tab, ['ghd'], { fuzzy: false }), false);
+  assert.equal(core.matchesTab(tab, ['docs'], { fuzzy: false }), true);
+});
+
+test('fuzzyScore - rejects mid-word starts and accepts boundaries', () => {
+  assert.notEqual(core.fuzzyScore('gh', 'github docs', 'GitHub Docs'), null);
+  assert.equal(core.fuzzyScore('gh', 'reddit - dive into anything', 'Reddit - Dive into anything'), null);
+  assert.equal(core.fuzzyScore('toolong', 'short', 'short'), null);
+});
+
+test('rankTabs - literal matches outrank fuzzy matches', () => {
+  const tabs = [
+    { id: 1, title: 'GitHub Docs', url: 'https://docs.github.com/' },
+    { id: 2, title: 'ghd notes', url: 'https://example.com/' },
+  ];
+  const ranked = core.rankTabs(tabs, 'ghd');
+  assert.equal(ranked.length, 2);
+  assert.equal(ranked[0].id, 2);
+});
+
+test('rankTabs - earlier literal matches rank higher', () => {
+  const tabs = [
+    { id: 1, title: 'GitHub Docs', url: 'https://github.com/docs' },
+    { id: 2, title: 'Docs', url: 'https://example.com/' },
+  ];
+  const ranked = core.rankTabs(tabs, 'docs');
+  assert.equal(ranked[0].id, 2);
+});
+
+test('rankTabs - returns only matching tabs', () => {
+  const tabs = [
+    { id: 1, title: 'GitHub', url: 'https://github.com/' },
+    { id: 2, title: 'Reddit', url: 'https://reddit.com/' },
+  ];
+  const ranked = core.rankTabs(tabs, 'github');
+  assert.deepEqual(ranked.map(entry => entry.id), [1]);
+  assert.equal(ranked[0].title, 'GitHub');
+});
+
+test('formatStatus - shows the best match for Enter', () => {
+  const text = core.formatStatus({
+    active: true,
+    total: 10,
+    matched: 2,
+    bestTitle: 'GitHub Docs',
+  });
+  assert.equal(text, 'Found 2 of 10 tabs \u00b7 \u21b5 GitHub Docs');
+});
+
+test('formatStatusTitle - explains what Enter opens', () => {
+  const title = core.formatStatusTitle({ active: true, bestTitle: 'GitHub Docs' });
+  assert.match(title, /Enter opens: GitHub Docs/);
+});
+
+test('native-tab-search - the focus shortcut uses valid XUL modifier tokens', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'native-tab-search.js'),
+    'utf8'
+  );
+  const match = /setAttribute\('modifiers',\s*'([^']+)'\)/.exec(source);
+  assert.ok(match, 'the modifiers attribute was not found');
+  // XUL silently ignores unknown tokens, so "ctrl,alt" registered a bare
+  // Alt+F (the File menu) instead of Ctrl+Alt+F.
+  const valid = new Set(['shift', 'alt', 'control', 'meta', 'os', 'accel', 'access']);
+  for (const token of match[1].split(',').map(value => value.trim())) {
+    assert.ok(valid.has(token), `invalid XUL modifier token: ${token}`);
+  }
+});

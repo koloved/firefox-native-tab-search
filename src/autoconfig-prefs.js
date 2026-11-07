@@ -13,3 +13,8 @@ pref("general.config.sandbox_enabled", false);
 // Native vertical tabs are required for the search field. This is a default,
 // so an explicit user choice in about:config or Settings still wins.
 pref("sidebar.verticalTabs", true);
+
+// Fuzzy matching lets "ghd" find "GitHub Docs" and "gihub" find "GitHub".
+// Literal substring matches always win, so disabling this only removes the
+// extra matches. Set it to false in about:config for strict substring search.
+pref("fnts.fuzzySearch", true);

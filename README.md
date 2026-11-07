@@ -21,7 +21,9 @@ come back. Active and pinned tabs always stay visible.
 
 Tested on Windows with stable Firefox 159.0: filtering and clearing,
 pinned/active tabs, new tabs during a filter, external show, native tab groups,
-collapsed sidebar, `Ctrl+Alt+F`, and multiple windows.
+collapsed sidebar, `Ctrl+Alt+F`, and multiple windows. Fuzzy matching,
+Enter-to-open and the shortcut were re-verified end-to-end on stable Firefox
+159.0.1 and Nightly 161.0a1.
 
 ## Install
 
@@ -53,6 +55,12 @@ To install into a non-standard location:
 - Click the field or press **Ctrl+Alt+F**.
 - Type a title, URL or domain. Whitespace separates terms; every term must
   match.
+- Matching is fuzzy: `ghd` finds *GitHub Docs*, `gihub` finds *GitHub*, and
+  `ff` finds *Firefox*. A fuzzy term must start on a word boundary, so short
+  queries do not match everything.
+- Literal matches always win, so `mail` still finds *Gmail* and `hub` still
+  finds *GitHub*.
+- Press **Enter** to open the best match and clear the filter.
 - Press **Esc** or click the clear button to restore the tabs.
 - The panel follows the Firefox light or dark theme.
 - **Active, pinned, and browser-protected tabs** cannot be hidden by Firefox and
@@ -66,6 +74,16 @@ To install into a non-standard location:
   active. Their headers return when the filter is cleared, and your
   collapsed/expanded state is preserved.
 - When the sidebar is collapsed, the panel becomes a single search icon.
+
+### Fuzzy search
+
+Fuzzy matching is on by default. Set `fnts.fuzzySearch` to `false` in
+`about:config` for strict substring search; the change applies to the next
+keystroke.
+
+The counter names the tab that **Enter** will open, for example
+`Found 1 of 8 tabs · ↵ GitHub Docs`. Hover it for the full title and the
+per-category counts.
 
 ## Uninstall
 
@@ -110,6 +128,9 @@ code. The installed script is generated from `src/core.js` and
   or Firefox restarts. Nothing is written to the profile.
 - **Some tabs cannot be hidden.** Firefox blocks hiding the active tab and
   pinned tabs. The counter reports them as `can't be hidden`.
+- **Short queries match broadly.** Fuzzy matching is deliberately permissive,
+  so a one- or two-letter query can keep more tabs visible than a substring
+  search would. The counter always shows the exact number of matches.
 - **Vertical tabs are required.** The field lives inside the native vertical
   tab strip. Without vertical tabs there is no place to show it.
 
@@ -125,6 +146,9 @@ code. The installed script is generated from `src/core.js` and
   prints the lines to merge.
 - **Nothing hides.** Verify that the tab is not active or pinned. The counter
   shows how many tabs Firefox refused to hide.
+- **Ctrl+Alt+F does nothing.** Another program may already own that
+  combination. Click the field instead; the shortcut is a plain XUL `<key>`
+  and needs no extra permission.
 
 ## Development
 

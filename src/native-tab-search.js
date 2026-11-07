@@ -9,7 +9,7 @@
 var FirefoxNativeTabSearch = (function () {
   'use strict';
 
-  const VERSION = '1.0.0';
+  const VERSION = '1.1.1';
   const LOG_PREFIX = '[Native Tab Search]';
   const HOST_ID = 'firefox-native-tab-search-host';
   const STYLE_ID = 'firefox-native-tab-search-style';
@@ -73,6 +73,22 @@ var FirefoxNativeTabSearch = (function () {
       }
     } catch {
       // Console is optional.
+    }
+  }
+
+  /**
+   * Reads the fuzzy-matching preference.
+   *
+   * Fuzzy matching lets "ghd" find "GitHub Docs". Literal substring matches
+   * always win, so turning this off only removes the extra matches.
+   *
+   * @returns {boolean} True when fuzzy matching is enabled (the default).
+   */
+  function isFuzzyEnabled() {
+    try {
+      return getServices().prefs.getBoolPref('fnts.fuzzySearch', true);
+    } catch {
+      return true;
     }
   }
 
@@ -714,7 +730,10 @@ var FirefoxNativeTabSearch = (function () {
     }
 
     const tabs = describeTabs(win);
-    const matchedIds = core.computeMatchedIds(tabs, query);
+    const ranked = core.rankTabs(tabs, query, { fuzzy: isFuzzyEnabled() });
+    const matchedIds = new Set();
+    for (const entry of ranked) matchedIds.add(entry.id);
+    const best = ranked.length > 0 ? ranked[0] : null;
     const plan = core.buildVisibilityPlan(
       tabs,
       matchedIds,
@@ -768,6 +787,7 @@ var FirefoxNativeTabSearch = (function () {
       query,
       total: tabs.length,
       matched: plan.matchedCount,
+      bestTitle: best ? best.title : '',
       visibleMatched: plan.visibleMatched,
       hiddenMatched: plan.hiddenMatched,
       hiddenByFilter: session.ownedHidden.size,
@@ -859,6 +879,39 @@ var FirefoxNativeTabSearch = (function () {
   }
 
   /**
+   * Opens the best-ranked match for the current query.
+   *
+   * The ranking is recomputed here instead of being read from the last status
+   * update, so Enter always acts on the text that is currently in the field.
+   *
+   * @param {Object} instance - Per-window integration state.
+   * @returns {void}
+   */
+  function openBestMatch(instance) {
+    if (!instance || instance.disposed || !core) return;
+    const session = instance.session;
+    const query = typeof session.query === 'string' ? session.query.trim() : '';
+    if (!query) return;
+
+    const ranked = core.rankTabs(describeTabs(instance.win), query, { fuzzy: isFuzzyEnabled() });
+    if (ranked.length === 0) return;
+    const target = ranked[0].id;
+
+    // Restore every tab first, so the switch happens against the full strip.
+    clearSession(instance);
+    try {
+      instance.win.gBrowser.selectedTab = target;
+    } catch (err) {
+      warn('Could not open the best match:', err);
+    }
+    try {
+      instance.input.blur();
+    } catch {
+      // The field is gone.
+    }
+  }
+
+  /**
    * Handles key presses in the search field.
    *
    * @param {Object} instance - Per-window integration state.
@@ -871,6 +924,12 @@ var FirefoxNativeTabSearch = (function () {
       event.stopPropagation();
       clearSession(instance);
       focusField(instance);
+      return;
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.stopPropagation();
+      openBestMatch(instance);
     }
   }
 
@@ -1126,13 +1185,24 @@ var FirefoxNativeTabSearch = (function () {
 
     // Ctrl+Alt+F focuses the field from anywhere in the window. A XUL <key>
     // element works even while web content has keyboard focus.
+    //
+    // The modifier token is "control", not "ctrl". XUL only understands
+    // shift, alt, control, meta, os, accel and access, and silently ignores
+    // anything else, so "ctrl,alt" registered a bare Alt+F (the File menu)
+    // instead of Ctrl+Alt+F.
     try {
       const key = doc.createXULElement('key');
       key.id = KEY_ID;
       key.setAttribute('key', 'F');
-      key.setAttribute('modifiers', 'ctrl,alt');
+      key.setAttribute('modifiers', 'control,alt');
       key.addEventListener('command', () => focusField(instance));
-      const keyset = doc.getElementById('mainKeyset') || doc.documentElement;
+      let keyset = doc.getElementById('mainKeyset');
+      if (!keyset) {
+        // A <key> outside a <keyset> is never registered.
+        keyset = doc.createXULElement('keyset');
+        keyset.id = 'fnts-keyset';
+        doc.documentElement.appendChild(keyset);
+      }
       keyset.appendChild(key);
       instance.keyElement = key;
     } catch (err) {

@@ -1,6 +1,6 @@
 {
   "name": "firefox-native-tab-search",
-  "version": "1.0.0",
+  "version": "1.1.1",
   "private": true,
   "description": "A native vertical-tabs search field for stable Firefox without an extension.",
   "license": "MIT",
